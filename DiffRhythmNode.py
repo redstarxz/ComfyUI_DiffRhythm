@@ -214,13 +214,16 @@ class DiffRhythmRun:
 
         return audio_emb
 
+from MWAudioRecorderDR import AudioRecorderDR
 
 NODE_CLASS_MAPPINGS = {
     "DiffRhythmRun": DiffRhythmRun,
     "MultiLinePrompt": MultiLinePrompt,
+    "AudioRecorderDR": AudioRecorderDR
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
     "DiffRhythmRun": "DiffRhythm Run",
     "MultiLinePrompt": "Multi Line Prompt",
+    "AudioRecorderDR": "MW Audio Recorder"
 }
