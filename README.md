@@ -1,4 +1,4 @@
-[中文](README.md) | [English](README-en.md) 
+[中文](README-CN.md) | [English](README.md) 
 
 # DiffRhythm Node for ComfyUI
 

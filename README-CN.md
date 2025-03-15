@@ -1,4 +1,4 @@
-[中文](README.md) | [English](README-en.md) 
+[中文](README-CN.md) | [English](README.md) 
 
 # DiffRhythm 的 ComfyUI 节点
 
