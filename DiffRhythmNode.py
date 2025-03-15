@@ -15,22 +15,26 @@
 # limitations under the License.
 
 import torchaudio
-import librosa
 from mutagen.mp3 import MP3
 import torch
 from einops import rearrange
 import sys
 import os
+import json
+from muq import MuQMuLan
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, current_dir)
+
+from model import DiT, CFM
 
 from diffrhythm_utils import (
     decode_audio,
     get_lrc_token,
     get_negative_style_prompt,
     get_reference_latent,
-    prepare_model,
+    CNENTokenizer,
+    load_checkpoint,
 )
 
 
@@ -105,12 +109,19 @@ class DiffRhythmRun:
         device = "cuda"
     elif torch.mps.is_available():
         device = "mps"
+    
+    node_dir = os.path.dirname(os.path.abspath(__file__))
+    comfy_path = os.path.dirname(os.path.dirname(node_dir))
+    model_path = os.path.join(comfy_path, "models", "TTS")
+    models = ["cfm_model.pt", "cfm_full_model.pt"]
 
     @classmethod
     def INPUT_TYPES(cls):
                
         return {
             "required": {
+                "model": (cls.models, {"default": "cfm_full_model.pt"}),
+                # "audio_length": ([95, 285], {"default": 285, "tooltip": "The length of the audio to generate."}),
                 "style_prompt": ("STRING", {
                     "multiline": True, 
                     "default": ""}),
@@ -130,6 +141,7 @@ class DiffRhythmRun:
     
     def diffrhythmgen(
             self,
+            model: str,
             style_prompt: str, 
             # audio_length: int,
             lyrics_prompt: str = "", 
@@ -137,14 +149,14 @@ class DiffRhythmRun:
             chunked: bool = False,
             seed: int = 0):
 
-        # if audio_length == 95:
-        #     max_frames = 2048
-        # elif audio_length == 285:  # current not available
-        #     max_frames = 6144
-        max_frames = 2048
-        cfm, tokenizer, muq, vae = prepare_model(self.device)
+        if model == "cfm_model.pt":
+            max_frames = 2048
+        elif model == "cfm_full_model.pt": 
+            max_frames = 6144
 
-        lrc_prompt, start_time = get_lrc_token(lyrics_prompt, tokenizer, self.device)
+        cfm, tokenizer, muq, vae = self.prepare_model(model, self.device)
+
+        lrc_prompt, start_time = get_lrc_token(max_frames, lyrics_prompt, tokenizer, self.device)
 
         if style_audio:
             prompt = self.get_style_prompt(muq, style_audio)
@@ -218,6 +230,79 @@ class DiffRhythmRun:
         audio_emb = audio_emb.half()
 
         return audio_emb
+        
+    def prepare_model(self, model, device):
+        from huggingface_hub import snapshot_download
+        # prepare cfm model
+        if model == "cfm_full_model.pt":
+            dit_ckpt_path = f"{self.model_path}/DiffRhythm/cfm_full_model.pt"
+            dit_config_path = f"{self.model_path}/DiffRhythm/config.json"
+            if not os.path.exists(dit_ckpt_path):
+                snapshot_download(repo_id="ASLP-lab/DiffRhythm-full",
+                                    local_dir=f"{self.model_path}/DiffRhythm")
+            
+        elif model == "cfm_model.pt":
+            dit_ckpt_path = f"{self.model_path}/DiffRhythm/cfm_model.pt"
+            dit_config_path = f"{self.node_dir}/config/diffrhythm-1b.json"
+            if not os.path.exists(dit_ckpt_path):
+                snapshot_download(repo_id="ASLP-lab/DiffRhythm-base",
+                                    local_dir=f"{self.model_path}/DiffRhythm")
+
+        vae_ckpt_path = f"{self.model_path}/DiffRhythm/vae_model.pt"
+
+        if not os.path.exists(vae_ckpt_path):
+            snapshot_download(repo_id="ASLP-lab/DiffRhythm-vae",
+                                local_dir=f"{self.model_path}/DiffRhythm", 
+                                ignore_patterns=["*safetensors"])
+            
+        try:
+            with open(dit_config_path, "r", encoding="utf-8") as f:
+                model_config = json.load(f)
+        except Exception as e:
+            raise
+        
+        dit_model_cls = DiT
+        if model == "cfm_model.pt":
+            cfm = CFM(
+                transformer=dit_model_cls(**model_config["model"], use_style_prompt=True, max_pos=2048),
+                num_channels=model_config["model"]["mel_dim"],
+            )
+        elif model == "cfm_full_model.pt":
+            cfm = CFM(
+                    transformer=dit_model_cls(**model_config["model"], use_style_prompt=True, max_pos=6144),
+                    num_channels=model_config["model"]['mel_dim'],
+                    use_style_prompt=True
+                )
+        cfm = cfm.to(device)
+
+        try:
+            cfm = load_checkpoint(cfm, dit_ckpt_path, device=device, use_ema=False)
+        except Exception as e:
+            raise
+
+        # prepare tokenizer
+        try:
+            tokenizer = CNENTokenizer()
+        except Exception as e:
+            raise
+
+        # prepare muq model
+        try:
+            # 修改这部分代码
+            muq = MuQMuLan.from_pretrained("OpenMuQ/MuQ-MuLan-large", cache_dir=f"{self.model_path}/DiffRhythm")
+        except Exception as e:
+            raise
+        
+        muq = muq.to(device).eval()
+
+        # prepare vae
+        try:
+            vae = torch.jit.load(vae_ckpt_path, map_location="cpu").to(device)
+        except Exception as e:
+            raise
+
+        return cfm, tokenizer, muq, vae
+
 
 from MWAudioRecorderDR import AudioRecorderDR
 

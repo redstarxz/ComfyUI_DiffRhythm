@@ -9,6 +9,14 @@
 
 ## 📣 更新
 
+[2025-03-16]⚒️: 发布版本 v2.0.0. 支持全长音乐生成, 4 分钟仅需 62 秒.
+
+![](https://github.com/billwuhao/ComfyUI_DiffRhythm/blob/master/images/2025-03-16_03-53-48.png)
+
+下载模型放到 `ComfyUI\models\TTS\DiffRhythm` 文件夹下:
+
+- [DiffRhythm-full](https://huggingface.co/ASLP-lab/DiffRhythm-full)  模型重命名为 `cfm_full_model.pt`, 同时下载 comfig.json 放到一起.
+
 [2025-03-13]⚒️: 发布版本 v1.0.0.
 
 - 所有参数均是可选的, 不提供任何参数随机生成音乐.

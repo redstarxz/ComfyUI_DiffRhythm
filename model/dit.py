@@ -1,22 +1,10 @@
-# Copyright (c) 2025 ASLP-LAB
-#               2025 Ziqian Ning   (ningziqian@mail.nwpu.edu.cn)
-#               2025 Huakang Chen  (huakang@mail.nwpu.edu.cn)
-#               2025 Yuepeng Jiang (Jiangyp@mail.nwpu.edu.cn)
-#
-# Licensed under the Stability AI License (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#   https://huggingface.co/stabilityai/stable-audio-open-1.0/blob/main/LICENSE.md
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-""" This implementation is adapted from github repo:
-    https://github.com/SWivid/F5-TTS.
+"""
+ein notation:
+b - batch
+n - sequence
+nt - text sequence
+nw - raw wave length
+d - dimension
 """
 
 from __future__ import annotations
@@ -24,28 +12,32 @@ from __future__ import annotations
 import torch
 from torch import nn
 import torch
-
+import torch.nn.functional as F
 from transformers.models.llama.modeling_llama import LlamaDecoderLayer, LlamaRotaryEmbedding
 from transformers.models.llama import LlamaConfig
+from torch.utils.checkpoint import checkpoint
 
 from model.modules import (
     TimestepEmbedding,
     ConvNeXtV2Block,
     ConvPositionEmbedding,
+    DiTBlock,
     AdaLayerNormZero_Final,
     precompute_freqs_cis,
     get_pos_embed_indices,
 )
+# from liger_kernel.transformers import apply_liger_kernel_to_llama
+# apply_liger_kernel_to_llama()
 
 # Text embedding
 class TextEmbedding(nn.Module):
-    def __init__(self, text_num_embeds, text_dim, conv_layers=0, conv_mult=2):
+    def __init__(self, text_num_embeds, text_dim, max_pos, conv_layers=0, conv_mult=2):
         super().__init__()
         self.text_embed = nn.Embedding(text_num_embeds + 1, text_dim)  # use 0 as filler token
 
         if conv_layers > 0:
             self.extra_modeling = True
-            self.precompute_max_pos = 4096  # ~44s of 24khz audio
+            self.precompute_max_pos = max_pos  # ~44s of 24khz audio
             self.register_buffer("freqs_cis", precompute_freqs_cis(text_dim, self.precompute_max_pos), persistent=False)
             self.text_blocks = nn.Sequential(
                 *[ConvNeXtV2Block(text_dim, text_dim * conv_mult) for _ in range(conv_layers)]
@@ -93,7 +85,9 @@ class InputEmbedding(nn.Module):
         return x
 
 
-# Transformer backbone using Llama blocks
+# Transformer backbone using DiT blocks
+
+
 class DiT(nn.Module):
     def __init__(
         self,
@@ -108,7 +102,9 @@ class DiT(nn.Module):
         text_num_embeds=256,
         text_dim=None,
         conv_layers=0,
-        long_skip_connection=False
+        long_skip_connection=False,
+        use_style_prompt=False,
+        max_pos=2048,
     ):
         super().__init__()
 
@@ -117,14 +113,16 @@ class DiT(nn.Module):
         self.start_time_embed = TimestepEmbedding(cond_dim)
         if text_dim is None:
             text_dim = mel_dim
-        self.text_embed = TextEmbedding(text_num_embeds, text_dim, conv_layers=conv_layers)
+        self.text_embed = TextEmbedding(text_num_embeds, text_dim, conv_layers=conv_layers, max_pos=max_pos)
         self.input_embed = InputEmbedding(mel_dim, text_dim, dim, cond_dim=cond_dim)
+
 
         self.dim = dim
         self.depth = depth
 
-        llama_config = LlamaConfig(hidden_size=dim, intermediate_size=dim * ff_mult, hidden_act='silu')
+        llama_config = LlamaConfig(hidden_size=dim, intermediate_size=dim * ff_mult, hidden_act='silu', max_position_embeddings=max_pos)
         llama_config._attn_implementation = 'sdpa'
+
         self.transformer_blocks = nn.ModuleList(
             [LlamaDecoderLayer(llama_config, layer_idx=i) for i in range(depth)]
         )
@@ -146,6 +144,7 @@ class DiT(nn.Module):
         self.norm_out = AdaLayerNormZero_Final(dim, cond_dim)  # final modulation
         self.proj_out = nn.Linear(dim, mel_dim)
 
+
     def forward_timestep_invariant(self, text, seq_len, drop_text, start_time):
         s_t = self.start_time_embed(start_time)
         text_embed = self.text_embed(text, seq_len, drop_text=drop_text)
@@ -159,28 +158,21 @@ class DiT(nn.Module):
     def forward(
         self,
         x: float["b n d"],  # nosied input audio  # noqa: F722
+        text_embed: int["b nt"],  # text  # noqa: F722
+        text_residuals,
         cond: float["b n d"],  # masked cond audio  # noqa: F722
-        text: int["b nt"],  # text  # noqa: F722
         time: float["b"] | float[""],  # time step  # noqa: F821 F722
         drop_audio_cond,  # cfg for cond audio
-        drop_text,  # cfg for text
         drop_prompt=False,
         style_prompt=None, # [b d t]
-        style_prompt_lens=None,
-        mask: bool["b n"] | None = None,  # noqa: F722
-        grad_ckpt=False,
         start_time=None,
     ):
-
         batch, seq_len = x.shape[0], x.shape[1]
         if time.ndim == 0:
             time = time.repeat(batch)
 
-        # t: conditioning time, c: context (text + masked cond audio), x: noised input audio
         t = self.time_embed(time)
-        s_t = self.start_time_embed(start_time)
-        c = t + s_t
-        text_embed = self.text_embed(text, seq_len, drop_text=drop_text)
+        c = t + start_time
 
         if drop_prompt:
             style_prompt = torch.zeros_like(style_prompt)
@@ -199,7 +191,7 @@ class DiT(nn.Module):
         for i, block in enumerate(self.transformer_blocks):
             x, *_ = block(x, position_embeddings=rotary_embed)
             if i < self.depth // 2:
-                x = x + self.text_fusion_linears[i](text_embed)
+                x = x + text_residuals[i]
 
         if self.long_skip_connection is not None:
             x = self.long_skip_connection(torch.cat((x, residual), dim=-1))

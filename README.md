@@ -8,6 +8,14 @@ Blazingly Fast and Embarrassingly Simple End-to-End Full-Length Song Generation.
 
 ## 📣 update
 
+[2025-03-16]⚒️: Released version v2.0.0. Supports full-length music generation, 4 minutes only takes 62 seconds.
+
+![](https://github.com/billwuhao/ComfyUI_DiffRhythm/blob/master/images/2025-03-16_03-53-48.png)
+
+Download the model and place it in the `ComfyUI\models\TTS\DiffRhythm` folder:
+
+- [DiffRhythm-full](https://huggingface.co/ASLP-lab/DiffRhythm-full)  Rename the model to `cfm_full_model.pt`, and also download `comfig.json` and put it together.
+
 [2025-03-13]⚒️: Release version v1.0.0.
 
 - All parameters are optional; you can generate random music without providing any parameters.

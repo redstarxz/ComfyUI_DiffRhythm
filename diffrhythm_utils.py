@@ -17,16 +17,10 @@
 import torch
 import random
 import json
-from muq import MuQMuLan
 import os
 import numpy as np
-from huggingface_hub import hf_hub_download
-
-from model import DiT, CFM
 
 node_dir = os.path.dirname(os.path.abspath(__file__))
-comfy_path = os.path.dirname(os.path.dirname(node_dir))
-model_path = os.path.join(comfy_path, "models", "TTS")
 
 def decode_audio(latents, vae_model, chunked=False, overlap=32, chunk_size=128):
     downsampling_ratio = 2048
@@ -88,64 +82,6 @@ def decode_audio(latents, vae_model, chunked=False, overlap=32, chunk_size=128):
             # paste the chunked audio into our y_final output audio
             y_final[:, :, t_start:t_end] = y_chunk[:, :, chunk_start:chunk_end]
         return y_final
-
-
-def prepare_model(device):
-    # prepare cfm model
-    dit_ckpt_path = f"{model_path}/DiffRhythm/cfm_model.pt"
-    dit_config_path = f"{node_dir}/config/diffrhythm-1b.json"
-    vae_ckpt_path = f"{model_path}/DiffRhythm/vae_model.pt"
-
-    from huggingface_hub import snapshot_download
-    if not os.path.exists(dit_ckpt_path):
-        snapshot_download(repo_id="ASLP-lab/DiffRhythm-base",
-                            local_dir=f"{model_path}/DiffRhythm")
-        
-    if not os.path.exists(vae_ckpt_path):
-        snapshot_download(repo_id="ASLP-lab/DiffRhythm-vae",
-                            local_dir=f"{model_path}/DiffRhythm", 
-                            ignore_patterns=["*safetensors"])
-        
-    try:
-        with open(dit_config_path, "r", encoding="utf-8") as f:
-            model_config = json.load(f)
-    except Exception as e:
-        raise
-    
-    dit_model_cls = DiT
-    cfm = CFM(
-        transformer=dit_model_cls(**model_config["model"]),
-        num_channels=model_config["model"]["mel_dim"],
-    )
-    cfm = cfm.to(device)
-    try:
-        cfm = load_checkpoint(cfm, dit_ckpt_path, device=device, use_ema=False)
-    except Exception as e:
-        raise
-
-    # prepare tokenizer
-    try:
-        tokenizer = CNENTokenizer()
-    except Exception as e:
-        raise
-
-    # prepare muq model
-    try:
-        # 修改这部分代码
-        muq = MuQMuLan.from_pretrained("OpenMuQ/MuQ-MuLan-large", cache_dir=f"{model_path}/DiffRhythm")
-    except Exception as e:
-        raise
-    
-    muq = muq.to(device).eval()
-
-    # prepare vae
-    try:
-        vae = torch.jit.load(vae_ckpt_path, map_location="cpu").to(device)
-    except Exception as e:
-        raise
-
-    return cfm, tokenizer, muq, vae
-
 
 # for song edit, will be added in the future
 def get_reference_latent(device, max_frames):
@@ -217,9 +153,9 @@ class CNENTokenizer:
             raise
 
 
-def get_lrc_token(text, tokenizer, device):
+def get_lrc_token(max_frames, text, tokenizer, device):
 
-    max_frames = 2048
+    # max_frames = 2048
     lyrics_shift = 0
     sampling_rate = 44100
     downsample_rate = 2048
@@ -245,7 +181,7 @@ def get_lrc_token(text, tokenizer, device):
         for (time_start, line) in lrc_with_time
         if time_start < max_secs
     ]
-    lrc_with_time = lrc_with_time[:-1] if len(lrc_with_time) >= 1 else lrc_with_time
+    # lrc_with_time = lrc_with_time[:-1] if len(lrc_with_time) >= 1 else lrc_with_time
 
     normalized_start_time = 0.0
 
