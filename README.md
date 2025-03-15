@@ -50,7 +50,7 @@ Add the environment variable `PHONEMIZER_ESPEAK_LIBRARY` to your system. The val
 
 - On Linux systems, you need to install the `espeak-ng` package. Execute the following command to install:
 
-`apt-get -qq -y install espeak-ng > /dev/null 2>&1`
+`apt-get -qq -y install espeak-ng`
 
 It should support Mac, but has not been tested.
 

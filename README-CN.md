@@ -51,7 +51,7 @@ Windows 系统做如下配置.
 
 Linux 系统下, 需要安装 `espeak-ng` 软件包. 执行如下命令安装:
 
-`apt-get -qq -y install espeak-ng > /dev/null 2>&1`
+`apt-get -qq -y install espeak-ng`
 
 应该支持 Mac, 但尚未测试.
 
