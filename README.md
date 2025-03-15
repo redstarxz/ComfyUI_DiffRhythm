@@ -1,27 +1,38 @@
 [中文](README.md) | [English](README-en.md) 
 
-# DiffRhythm 的 ComfyUI 节点
+# DiffRhythm Node for ComfyUI
 
-快速而简单的端到端全长歌曲生成.
+Blazingly Fast and Embarrassingly Simple End-to-End Full-Length Song Generation.
 
 ![](https://github.com/billwuhao/ComfyUI_DiffRhythm/blob/master/images/2025-03-12_23-49-32.png)
 
+## 📣 update
 
-## 📣 更新
+[2025-03-13]⚒️: Release version v1.0.0.
 
-[2025-03-13]⚒️: 发布版本 v1.0.0.
+- All parameters are optional; you can generate random music without providing any parameters.
 
-- 所有参数均是可选的, 不提供任何参数随机生成音乐.
+## Installation
 
-## 模型下载
+```
+cd ComfyUI/custom_nodes
+git clone https://github.com/billwuhao/ComfyUI_DiffRhythm.git
+cd ComfyUI_DiffRhythm
+pip install -r requirements.txt
 
-模型会自动下载到 `ComfyUI\models\TTS\DiffRhythm` 文件夹下.
+# python_embeded
+./python_embeded/python.exe -m pip install -r requirements.txt
+```
 
-结构如下:
+## Model Download
+
+Models will be automatically downloaded to the `ComfyUI\models\TTS\DiffRhythm` folder.
+
+The structure is as follows:
 
 ![](https://github.com/billwuhao/ComfyUI_DiffRhythm/blob/master/images/2025-03-13_00-08-51.png)
 
-手动下载地址:
+Manual Download Addresses:
 
 https://huggingface.co/ASLP-lab/DiffRhythm-base/blob/main/cfm_model.pt  
 https://huggingface.co/ASLP-lab/DiffRhythm-vae/blob/main/vae_model.pt  
@@ -29,18 +40,24 @@ https://huggingface.co/OpenMuQ/MuQ-MuLan-large/tree/main
 https://huggingface.co/OpenMuQ/MuQ-large-msd-iter/tree/main  
 https://huggingface.co/FacebookAI/xlm-roberta-base/tree/main
 
-## 环境配置
+## Environment Configuration
 
-Windows 系统做如下配置, 其他系统未测试. 应该支持 Linux, Mac.
+- Configure the following on Windows systems:
 
-下载安装最新版 [espeak-ng](https://github.com/espeak-ng/espeak-ng/releases/tag/1.52.0)
+Download and install the latest version of [espeak-ng](https://github.com/espeak-ng/espeak-ng/releases/tag/1.52.0)
 
-添加环境变量 `PHONEMIZER_ESPEAK_LIBRARY` 到系统中, 值是你安装的 espeak-ng 软件中 `libespeak-ng.dll` 文件的路径, 例如: `C:\Program Files\eSpeak NG\libespeak-ng.dll`.
+Add the environment variable `PHONEMIZER_ESPEAK_LIBRARY` to your system. The value should be the path to the `libespeak-ng.dll` file in your espeak-ng installation, for example: `C:\Program Files\eSpeak NG\libespeak-ng.dll`.
 
-享受音乐吧🎶
+- On Linux systems, you need to install the `espeak-ng` package. Execute the following command to install:
 
-## 鸣谢
+`apt-get -qq -y install espeak-ng > /dev/null 2>&1`
+
+It should support Mac, but has not been tested.
+
+Enjoy the music! 🎶
+
+## Acknowledgements
 
 [DiffRhythm](https://github.com/ASLP-lab/DiffRhythm)
 
-感谢 DiffRhythm 团队的卓越的工作, 目前最强开源 音乐/歌曲 生成模型👍.
+Thanks to the DiffRhythm team for their excellent work. Currently the strongest open-source music/song generation model 👍.

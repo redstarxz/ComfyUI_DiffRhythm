@@ -19,6 +19,11 @@ import librosa
 from mutagen.mp3 import MP3
 import torch
 from einops import rearrange
+import sys
+import os
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, current_dir)
 
 from diffrhythm_utils import (
     decode_audio,

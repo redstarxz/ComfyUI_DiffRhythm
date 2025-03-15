@@ -1,15 +1,13 @@
-# accelerate==1.4.0
-# torchdiffeq==0.2.5
-# torchaudio==2.6.0
-# transformers==4.49.0
-# librosa==0.10.2.post1
-# pyarrow==19.0.1
-# pandas==2.2.3
-# bitsandbytes
-# jieba==0.42.1
-# cn2an==0.5.23
-# pypinyin==0.53.0
-# onnxruntime
+accelerate
+torchdiffeq
+librosa>=0.10.2.post1
+pyarrow
+pandas
+bitsandbytes
+jieba
+cn2an
+pypinyin
+onnxruntime
 LangSegment
 x-transformers
 pylance
