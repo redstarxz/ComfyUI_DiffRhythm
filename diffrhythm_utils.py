@@ -221,6 +221,8 @@ def get_lrc_token(max_frames, text, tokenizer, device):
 
 def load_checkpoint(model, ckpt_path, device, use_ema=True):
     model = model.half()
+    if device == 'mps':
+        model = model.float()
 
     ckpt_type = ckpt_path.split(".")[-1]
     try:
