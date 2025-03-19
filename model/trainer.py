@@ -31,7 +31,7 @@ from torch.optim.lr_scheduler import LinearLR, SequentialLR, ConstantLR
 
 from accelerate import Accelerator
 from accelerate.utils import DistributedDataParallelKwargs
-from dataset.dataset import DiffusionDataset
+from model.dataset import DiffusionDataset
 
 from torch.utils.data import DataLoader
 

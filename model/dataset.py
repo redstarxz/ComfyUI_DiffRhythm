@@ -24,7 +24,7 @@ class DiffusionDataset(torch.utils.data.Dataset):
         self.sampling_rate = sampling_rate
         self.downsample_rate = 2048
         self.max_secs = max_frames / (sampling_rate / downsample_rate)
-        
+
         self.file_path = file_path
         with open(file_path, 'r') as f:
             self.file_lst = [line.strip() for line in f.readlines()]
@@ -51,7 +51,7 @@ class DiffusionDataset(torch.utils.data.Dataset):
         except Exception as e:
             return None
         return item
-    
+
     def get_triple(self, item):
         utt, lrc_path, latent_path, style_path = item.split("|")
 
@@ -59,19 +59,19 @@ class DiffusionDataset(torch.utils.data.Dataset):
         input_times = time_lrc['time']
         input_lrcs = time_lrc['lrc']
         lrc_with_time = list(zip(input_times, input_lrcs))
-        
+
         latent = torch.load(latent_path, map_location='cpu') # [b, d, t]
         latent = latent.squeeze(0)
-        
+
         prompt = torch.load(style_path, map_location='cpu') # [b, d]
         prompt = prompt.squeeze(0)
-        
+
         max_start_frame = max(0, latent.shape[-1] - self.max_frames)
         start_frame = random.randint(0, max_start_frame)
         start_time = start_frame * self.downsample_rate / self.sampling_rate
         normalized_start_time = start_frame / latent.shape[-1]
         latent = latent[:, start_frame:]
-    
+
         lrc_with_time = [(time_start - start_time, line) for (time_start, line) in lrc_with_time if (time_start - start_time) >= 0] # empty for pure music
         lrc_with_time = [(time_start, line) for (time_start, line) in lrc_with_time if time_start < self.max_secs] # drop time longer than max_secs
 
@@ -79,11 +79,11 @@ class DiffusionDataset(torch.utils.data.Dataset):
             latent_end_time = lrc_with_time[-1][0]
         else:
             raise
-        
+
         lrc_with_time = lrc_with_time[:-1] if len(lrc_with_time) >= 1 else lrc_with_time # drop last, can be empty
 
         lrc = torch.zeros((self.max_frames,), dtype=torch.long)
-        
+
         tokens_count = 0
         last_end_pos = 0
         for time_start, line in lrc_with_time:
@@ -92,7 +92,7 @@ class DiffusionDataset(torch.utils.data.Dataset):
             num_tokens = tokens.shape[0]
 
             gt_frame_start = int(time_start * self.sampling_rate / self.downsample_rate)
-            
+
             frame_shift = 0
 
             frame_start = max(gt_frame_start - frame_shift, last_end_pos)
@@ -101,7 +101,7 @@ class DiffusionDataset(torch.utils.data.Dataset):
             lrc[frame_start:frame_start + frame_len] = tokens[:frame_len]
 
             tokens_count += num_tokens
-            last_end_pos = frame_start + frame_len        
+            last_end_pos = frame_start + frame_len
 
         latent = latent[:, :int(latent_end_time * self.sampling_rate / self.downsample_rate)]
 
@@ -164,7 +164,7 @@ class DiffusionDataset(torch.utils.data.Dataset):
 
 
 if __name__ == "__main__":
-    dd = DiffusionDataset("train.scp", 2048, 512)
+    dd = DiffusionDataset("../dataset/train.scp", 2048, 512)
     x = dd[0]
     import pdb; pdb.set_trace()
     print(x)
