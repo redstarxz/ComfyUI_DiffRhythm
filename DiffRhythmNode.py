@@ -24,7 +24,7 @@ import json
 from muq import MuQMuLan
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, current_dir)
+sys.path.append(current_dir)
 
 from model import DiT, CFM
 
@@ -60,7 +60,7 @@ def inference(
                 cfg_strength=4.0,
                 start_time=start_time,
             )
-        
+
 
         generated = generated.to(torch.float32)
         latent = generated.transpose(1, 2)  # [b d t]
@@ -85,11 +85,11 @@ def inference(
 class MultiLinePrompt:
     @classmethod
     def INPUT_TYPES(cls):
-               
+
         return {
             "required": {
                 "multi_line_prompt": ("STRING", {
-                    "multiline": True, 
+                    "multiline": True,
                     "default": ""}),
                 },
         }
@@ -98,7 +98,7 @@ class MultiLinePrompt:
     RETURN_TYPES = ("STRING",)
     RETURN_NAMES = ("prompt",)
     FUNCTION = "promptgen"
-    
+
     def promptgen(self, multi_line_prompt: str):
         return (multi_line_prompt.strip(),)
 
@@ -109,7 +109,7 @@ class DiffRhythmRun:
         device = "cuda"
     elif torch.backends.mps.is_available():
         device = "mps"
-    
+
     node_dir = os.path.dirname(os.path.abspath(__file__))
     comfy_path = os.path.dirname(os.path.dirname(node_dir))
     model_path = os.path.join(comfy_path, "models", "TTS")
@@ -117,13 +117,13 @@ class DiffRhythmRun:
 
     @classmethod
     def INPUT_TYPES(cls):
-               
+
         return {
             "required": {
                 "model": (cls.models, {"default": "cfm_full_model.pt"}),
                 # "audio_length": ([95, 285], {"default": 285, "tooltip": "The length of the audio to generate."}),
                 "style_prompt": ("STRING", {
-                    "multiline": True, 
+                    "multiline": True,
                     "default": ""}),
                 },
             "optional": {
@@ -138,20 +138,20 @@ class DiffRhythmRun:
     RETURN_TYPES = ("AUDIO",)
     RETURN_NAMES = ("audio",)
     FUNCTION = "diffrhythmgen"
-    
+
     def diffrhythmgen(
             self,
             model: str,
-            style_prompt: str, 
+            style_prompt: str,
             # audio_length: int,
-            lyrics_prompt: str = "", 
+            lyrics_prompt: str = "",
             style_audio: str = None,
             chunked: bool = False,
             seed: int = 0):
 
         if model == "cfm_model.pt":
             max_frames = 2048
-        elif model == "cfm_full_model.pt": 
+        elif model == "cfm_full_model.pt":
             max_frames = 6144
 
         cfm, tokenizer, muq, vae = self.prepare_model(model, self.device)
@@ -196,7 +196,7 @@ class DiffRhythmRun:
 
         waveform = audio["waveform"]
         sample_rate = audio["sample_rate"]
-        
+
         # 确保波形是正确的形状
         if len(waveform.shape) == 3:  # [1, channels, samples]
             waveform = waveform.squeeze(0)
@@ -205,7 +205,7 @@ class DiffRhythmRun:
 
         # 计算音频长度（秒）
         audio_len = waveform.shape[-1] / sample_rate
-        
+
         if audio_len < 10:
             raise ValueError(f"The audio is too short ({audio_len:.2f} s), it takes at least 10 seconds.")
 
@@ -230,7 +230,7 @@ class DiffRhythmRun:
         audio_emb = audio_emb.half()
 
         return audio_emb
-        
+
     def prepare_model(self, model, device):
         from huggingface_hub import snapshot_download
         # prepare cfm model
@@ -240,7 +240,7 @@ class DiffRhythmRun:
             if not os.path.exists(dit_ckpt_path):
                 snapshot_download(repo_id="ASLP-lab/DiffRhythm-full",
                                     local_dir=f"{self.model_path}/DiffRhythm")
-            
+
         elif model == "cfm_model.pt":
             dit_ckpt_path = f"{self.model_path}/DiffRhythm/cfm_model.pt"
             dit_config_path = f"{self.node_dir}/config/diffrhythm-1b.json"
@@ -252,15 +252,15 @@ class DiffRhythmRun:
 
         if not os.path.exists(vae_ckpt_path):
             snapshot_download(repo_id="ASLP-lab/DiffRhythm-vae",
-                                local_dir=f"{self.model_path}/DiffRhythm", 
+                                local_dir=f"{self.model_path}/DiffRhythm",
                                 ignore_patterns=["*safetensors"])
-            
+
         try:
             with open(dit_config_path, "r", encoding="utf-8") as f:
                 model_config = json.load(f)
         except Exception as e:
             raise
-        
+
         dit_model_cls = DiT
         if model == "cfm_model.pt":
             cfm = CFM(
@@ -292,7 +292,7 @@ class DiffRhythmRun:
             muq = MuQMuLan.from_pretrained("OpenMuQ/MuQ-MuLan-large", cache_dir=f"{self.model_path}/DiffRhythm")
         except Exception as e:
             raise
-        
+
         muq = muq.to(device).eval()
 
         # prepare vae
