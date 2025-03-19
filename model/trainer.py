@@ -31,7 +31,7 @@ from torch.optim.lr_scheduler import LinearLR, SequentialLR, ConstantLR
 
 from accelerate import Accelerator
 from accelerate.utils import DistributedDataParallelKwargs
-from dataset.dataset import DiffusionDataset
+from ..dataset.dataset import DiffusionDataset
 
 from torch.utils.data import DataLoader
 
@@ -73,7 +73,7 @@ class Trainer:
         ddp_kwargs = DistributedDataParallelKwargs(find_unused_parameters=False, )
 
         logger = "wandb" if wandb.api.api_key else None
-        
+
         self.accelerator = Accelerator(
             log_with=logger,
             kwargs_handlers=[ddp_kwargs],
@@ -132,7 +132,7 @@ class Trainer:
         self.reset_lr = reset_lr
 
         self.use_style_prompt = use_style_prompt
-        
+
         self.grad_ckpt = grad_ckpt
 
         if bnb_optimizer:
@@ -144,7 +144,7 @@ class Trainer:
 
         if self.accelerator.state.distributed_type == "DEEPSPEED":
             self.accelerator.state.deepspeed_plugin.deepspeed_config['train_micro_batch_size_per_gpu'] = batch_size
-        
+
         self.get_dataloader()
         self.get_scheduler()
 
@@ -218,7 +218,7 @@ class Trainer:
                 [f for f in os.listdir(self.checkpoint_path) if f.endswith(".pt")],
                 key=lambda x: int("".join(filter(str.isdigit, x))),
             )[-1]
-        
+
         checkpoint = torch.load(f"{self.checkpoint_path}/{latest_checkpoint}", map_location="cpu")
 
         if self.is_main:
@@ -227,7 +227,7 @@ class Trainer:
 
             filtered_ema_dict = {
                 k: v for k, v in ema_checkpoint_dict.items()
-                if k in ema_dict and ema_dict[k].shape == v.shape 
+                if k in ema_dict and ema_dict[k].shape == v.shape
             }
 
             self.ema_model.load_state_dict(filtered_ema_dict, strict=False)
@@ -237,11 +237,11 @@ class Trainer:
 
         filtered_model_dict = {
             k: v for k, v in checkpoint_model_dict.items()
-            if k in model_dict and model_dict[k].shape == v.shape  
+            if k in model_dict and model_dict[k].shape == v.shape
         }
 
         self.accelerator.unwrap_model(self.model).load_state_dict(filtered_model_dict, strict=False)
-        
+
         if "step" in checkpoint:
             if self.scheduler and not self.reset_lr:
                 self.scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
